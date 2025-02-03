@@ -3,51 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Babylon.js FBX Viewer</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Model Viewer</title>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { width: 100%; height: 100%; display: block; }
+        body { margin: 0; font-family: Arial, sans-serif; text-align: center; }
+        canvas { 
+            width: 70%; 
+            height: 900px; 
+            display: block;
+            margin: 0 auto; /* Center the canvas horizontally */
+            background-color: black;
+        }
+        select, button { margin: 10px; padding: 5px; font-size: 16px; }
+        .controls { margin: 20px; }
     </style>
 </head>
 <body>
+
+    <h2>Select Your Model</h2>
+    <div class="controls">
+        <select id="modelSelector">
+            <option value="House.glb">House</option>
+            <option value="HouseSection.glb">HouseSection</option>
+            <option value="DefaultHouse.glb">DefaultHouse</option>
+            <option value="MEPBuilding.glb">MEPBuilding</option>
+            <option value="MEPBuildingSection.glb">MEPBuildingSection</option>
+        </select>
+        <button id="viewToggle">Switch to First Person</button>
+    </div>
+
     <canvas id="renderCanvas"></canvas>
+
     <script>
-        window.addEventListener('DOMContentLoaded', function() {
-            // Get the canvas element
-            var canvas = document.getElementById("renderCanvas");
+        // Babylon.js Scene Setup
+        const canvas = document.getElementById("renderCanvas");
+        const engine = new BABYLON.Engine(canvas, true);
+        const scene = new BABYLON.Scene(engine);
+        scene.clearColor = new BABYLON.Color3(0, 0, 0);
 
-            // Create Babylon.js engine
-            var engine = new BABYLON.Engine(canvas, true);
+        // Create both cameras
+        const arcCamera = new BABYLON.ArcRotateCamera("arcCamera", Math.PI / 2, Math.PI / 2.5, 5, BABYLON.Vector3.Zero(), scene);
+        const fpsCamera = new BABYLON.FreeCamera("fpsCamera", new BABYLON.Vector3(0, 2, -5), scene);
+        
+        // Setup FPS camera
+        fpsCamera.attachControl(canvas, true);
+        fpsCamera.keysUp = [38];    // Arrow up
+        fpsCamera.keysDown = [40];   // Arrow down
+        fpsCamera.keysLeft = [37];   // Arrow left
+        fpsCamera.keysRight = [39];  // Arrow right
+        fpsCamera.speed = 0.2;
+        fpsCamera.angularSensibility = 4000;
 
-            // Create scene function
-            var createScene = function() {
-                var scene = new BABYLON.Scene(engine);
-                var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, Math.PI / 3, 5, BABYLON.Vector3.Zero(), scene);
-                camera.attachControl(canvas, true);
+        // Start with arc rotate camera
+        let activeCamera = arcCamera;
+        scene.activeCamera = activeCamera;
+        activeCamera.attachControl(canvas, true);
 
-                // Add lighting
-                var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
-                light.intensity = 0.7;
+        const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1, 1, 0), scene);
 
-                // Load the GLB model (converted from FBX)
-                BABYLON.SceneLoader.Append("", "model.glb", scene, function(scene) {
-                    console.log("Model Loaded!");
-                });
+        let modelMesh = null;
 
-                return scene;
-            };
+        function loadModel(modelPath) {
+            // Clear previous model if exists
+            if (modelMesh) {
+                modelMesh.dispose();
+            }
 
-            var scene = createScene();
-            engine.runRenderLoop(function() {
-                scene.render();
+            // Add timestamp to prevent caching
+            const timestamp = new Date().getTime();
+            const modelPathWithTimestamp = `${modelPath}?t=${timestamp}`;
+
+            // Load selected .glb model
+            BABYLON.SceneLoader.ImportMesh("", "", modelPathWithTimestamp, scene, function (meshes) {
+                modelMesh = meshes[0];
+                modelMesh.position = new BABYLON.Vector3(0, 0, 0);
             });
+        }
 
-            window.addEventListener("resize", function() {
-                engine.resize();
-            });
+        // Toggle camera view
+        document.getElementById("viewToggle").addEventListener("click", function() {
+            if (activeCamera === arcCamera) {
+                activeCamera.detachControl(canvas);
+                activeCamera = fpsCamera;
+                this.textContent = "Switch to Orbit";
+            } else {
+                activeCamera.detachControl(canvas);
+                activeCamera = arcCamera;
+                this.textContent = "Switch to First Person";
+            }
+            scene.activeCamera = activeCamera;
+            activeCamera.attachControl(canvas, true);
         });
+
+        // Initial Load
+        loadModel(document.getElementById("modelSelector").value);
+
+        // Change Model on Selection
+        document.getElementById("modelSelector").addEventListener("change", function () {
+            loadModel(this.value);
+        });
+
+        engine.runRenderLoop(() => scene.render());
+        window.addEventListener("resize", () => engine.resize());
     </script>
+
 </body>
 </html>
